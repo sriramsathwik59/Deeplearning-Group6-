@@ -10,7 +10,7 @@ from torch.utils.data import Dataset, DataLoader
 train_folder = "/home/ubuntu/project/dataset/Train/"
 
 # Set the image size and number of channels
-img_size = (128, 160)
+img_size = (320, 320)
 num_channels = 3
 
 # Set the number of frames to use for input and prediction
@@ -28,37 +28,41 @@ print(f"Running on device: {device}")
 def load_image(image_path):
     # Read the image file
     image = cv2.imread(image_path)
-    
+
     # Convert the image from BGR to RGB format
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    
+
     # Resize the image to the desired size
     image = cv2.resize(image, img_size)
-    
+
     # Normalize the pixel values to the range [0, 1]
     image = image.astype(np.float32) / 255.0
-    
-    return image
 
+    return image
 class PredNet(nn.Module):
     def __init__(self, input_shape):
         super(PredNet, self).__init__()
-        
+
         self.encoder = nn.Sequential(
-            nn.Conv2d(input_shape[0] * input_shape[3], 32, kernel_size=3, padding=1),
+            nn.Conv2d(input_shape[0] * input_shape[3], 64, kernel_size=3, padding=1),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2),
-            nn.Conv2d(32, 64, kernel_size=3, padding=1),
+            nn.Conv2d(64, 128, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2),
+            nn.Conv2d(128, 256, kernel_size=3, padding=1),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2)
         )
-        
+
         self.decoder = nn.Sequential(
-            nn.ConvTranspose2d(64, 32, kernel_size=3, stride=2, padding=1, output_padding=1),
+            nn.ConvTranspose2d(256, 128, kernel_size=3, stride=2, padding=1, output_padding=1),
             nn.ReLU(),
-            nn.ConvTranspose2d(32, num_channels, kernel_size=3, stride=2, padding=1, output_padding=1)
+            nn.ConvTranspose2d(128, 64, kernel_size=3, stride=2, padding=1, output_padding=1),
+            nn.ReLU(),
+            nn.ConvTranspose2d(64, num_channels, kernel_size=3, stride=2, padding=1, output_padding=1)
         )
-        
+
     def forward(self, x):
         batch_size, num_frames, channels, height, width = x.size()
         x = x.reshape(batch_size, num_frames * channels, height, width)
@@ -177,5 +181,5 @@ for epoch in range(num_epochs):
 
 # Save the trained model
 print("Training completed. Saving the model...")
-torch.save(model.state_dict(), "prednet_model_set00_set01.pth")
+torch.save(model.state_dict(), "Model_320")
 print("Model saved as 'prednet_model_set00_set01.pth'")
