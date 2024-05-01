@@ -5,6 +5,11 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 import imageio
+from pytorch_msssim import ssim
+os.system('sudo pip install imageio')
+os.system('sudo pip install pytorch-msssim')
+
+
 
 # Set the path to the test folder
 test_folder = "/home/ubuntu/project/dataset/Test/"
@@ -122,11 +127,11 @@ def predict_frames(model, sequence_folder):
     predicted_frames = []
     image_files = sorted([f for f in os.listdir(sequence_folder) if f.endswith(".jpg")])
     
-    for i in range(0, len(image_files) - num_input_frames, num_input_frames):
+    for i in range(num_input_frames, len(image_files), num_output_frames):
         input_frames = []
         
         # Load the input frames
-        for j in range(i, i + num_input_frames):
+        for j in range(i - num_input_frames, i):
             image_path = os.path.join(sequence_folder, image_files[j])
             frame = load_image(image_path)
             input_frames.append(frame)
@@ -140,9 +145,49 @@ def predict_frames(model, sequence_folder):
             predicted_frames.append(output[0])
     
     return predicted_frames
+    
+def calculate_metrics(predicted_frames, ground_truth_frames):
+    predicted_frames = np.array(predicted_frames)
+    ground_truth_frames = np.array(ground_truth_frames)
+    
+    mse = np.mean((predicted_frames - ground_truth_frames) ** 2)
+    psnr = 10 * np.log10(1.0 / mse)
+    
+    predicted_frames_tensor = torch.from_numpy(predicted_frames).permute(0, 3, 1, 2).float()
+    ground_truth_frames_tensor = torch.from_numpy(ground_truth_frames).permute(0, 3, 1, 2).float()
+    
+    ssim_scores = ssim(predicted_frames_tensor, ground_truth_frames_tensor, data_range=255, size_average=False)
+    ssim_avg = ssim_scores.mean().item()
+    
+    return mse, psnr, ssim_avg
+
+def apply_sharpening(frame):
+    kernel = np.array([[0, -1, 0],
+                       [-1, 5,-1],
+                       [0, -1, 0]])
+    return cv2.filter2D(frame, -1, kernel)
 
 def create_gif(frames, output_path):
-    imageio.mimsave(output_path, frames, duration=0.1)
+    sharpened_frames = [apply_sharpening(frame.astype(np.uint8)) for frame in frames]
+    imageio.mimsave(output_path, sharpened_frames, duration=0.1)
+    
+def create_video(frames, output_path):
+    # Get the frame dimensions
+    height, width, _ = frames[0].shape
+    
+    # Create a video writer object
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    video_writer = cv2.VideoWriter(output_path, fourcc, 2, (width, height))
+    
+    # Write frames to the video
+    for frame in frames:
+        frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+        frame_8bit = cv2.convertScaleAbs(frame_bgr, alpha=(255.0))
+        video_writer.write(frame_8bit)
+    
+    # Release the video writer
+    video_writer.release()
+
 
 # Load the trained model
 input_shape = (num_input_frames, img_size[0], img_size[1], num_channels)
@@ -164,13 +209,26 @@ for data in test_dataloader:
     
     if sequence_folder not in processed_sequences:
         # Predict the frames
-        separated_predicted_frames = predict_frames(model, sequence_folder)
+        predicted_frames = predict_frames(model, sequence_folder)
         
-        # Create a GIF or video of the predicted frames
-        output_path = os.path.join(output_dir, os.path.basename(sequence_folder) + ".gif")
-        create_gif(separated_predicted_frames, output_path)
-        print(f"GIF/video created for sequence: {sequence_folder}")
+        # Load every 30th image from the test data to create the original video
+        original_frames = []
+        image_files = sorted([f for f in os.listdir(sequence_folder) if f.endswith(".jpg")])
+        for i in range(0, len(image_files), 30):
+            image_path = os.path.join(sequence_folder, image_files[i])
+            frame = load_image(image_path)
+            original_frames.append(frame)
+        
+        # Create a GIF of the predicted frames
+        predicted_output_path = os.path.join(output_dir, os.path.basename(sequence_folder) + "_predicted.gif")
+        create_gif(predicted_frames, predicted_output_path)
+        print(f"Predicted GIF created for sequence: {sequence_folder}")
+        
+        # Create a video of the original frames
+        original_output_path = os.path.join(output_dir, os.path.basename(sequence_folder) + "_original.mp4")
+        create_video(original_frames, original_output_path)
+        print(f"Original video created for sequence: {sequence_folder}")
         
         processed_sequences.add(sequence_folder)  # Mark the sequence folder as processed
 
-print("Prediction completed.") 
+print("Prediction completed.")
