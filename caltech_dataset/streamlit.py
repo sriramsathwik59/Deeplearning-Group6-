@@ -1,42 +1,34 @@
 import streamlit as st
-import numpy as np
 import tensorflow as tf
-import video  # Assuming video processing functions
-import models  # Your model definitions
+from caltech_test import test_model  
+from caltech_train import train_model  
 
-# Configuration for the model (fill in all necessary configurations)
-class Config:
-    modelname = 'my_model'
-    gpuid = 0
-    batch_size = 1  # Assuming prediction for one sample at a time
-    # Fill other necessary fields...
 
-config = Config()
-model = models.get_model(config, config.gpuid)  # Initialize model
+@st.cache(allow_output_mutation=True)
+def load_model():
+    model = tf.keras.models.load_model('Model_320')  # Update path if necessary
+    return model
 
-# Function to predict the next frame
-@tf.function
-def predict_next_frame(frame):
-    feed_dict = model.get_feed_dict({'data': frame}, is_train=False)  # Adjust based on actual data handling
-    pred_frame = model.traj_pred_out(feed_dict)  # Modify according to how the outputs are handled in TF2
-    return pred_frame
+model = load_model()
 
-st.title('Next Frame Prediction')
+st.title('Video Frame Prediction Tool')
 
-uploaded_file = st.file_uploader("Choose a video file", type=["mp4", "avi"])
+# Interface for Model Training
+if st.button('Train Model'):
+    train_model()
+    st.success('Model trained successfully!')
 
+# Interface for Model Testing
+st.header('Test the Model')
+# You might want to allow users to upload a video file or provide inputs for testing
+uploaded_file = st.file_uploader("Choose a file...")
 if uploaded_file is not None:
-    frames = video.convert_video_to_frames(uploaded_file)
-    st.video(uploaded_file)  # Displaying the uploaded video
+    # Assume test_model function exists and is ready to handle file input directly
+    result = test_model(uploaded_file, model)
+    st.write('Model output:', result)
 
-    frame_idx = st.slider('Select Frame', 0, len(frames) - 1, 0)
-    current_frame = frames[frame_idx]
-    next_frame = predict_next_frame(current_frame)
+# Display model summary
+st.header('Model Summary')
+model.summary(print_fn=lambda x: st.text(x))
 
-    col1, col2 = st.columns(2)
-    with col1:
-        st.header("Current Frame")
-        st.image(current_frame, use_column_width=True)
-    with col2:
-        st.header("Predicted Next Frame")
-        st.image(next_frame, use_column_width=True)
+# Run this app with `streamlit run your_script.py`
