@@ -6,13 +6,9 @@ import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 import imageio
 from pytorch_msssim import ssim
-os.system('sudo pip install imageio')
-os.system('sudo pip install pytorch-msssim')
-
-
-
+current_directory = os.getcwd()
 # Set the path to the test folder
-test_folder = "/home/ubuntu/project/dataset/Test/"
+test_folder = os.path.join(current_directory, "dataset/Test")
 
 # Set the image size and number of channels
 img_size = (320, 320)
@@ -48,36 +44,56 @@ class PredNet(nn.Module):
     def __init__(self, input_shape):
         super(PredNet, self).__init__()
 
-        self.encoder = nn.Sequential(
-            nn.Conv2d(input_shape[0] * input_shape[3], 64, kernel_size=3, padding=1),
+        # CNN
+        self.cnn = nn.Sequential(
+            nn.Conv2d(input_shape[0] * input_shape[3], 32, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2),
+            nn.Conv2d(32, 64, kernel_size=3, padding=1),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2),
             nn.Conv2d(64, 128, kernel_size=3, padding=1),
             nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2),
-            nn.Conv2d(128, 256, kernel_size=3, padding=1),
-            nn.ReLU(),
             nn.MaxPool2d(kernel_size=2)
         )
 
-        self.decoder = nn.Sequential(
-            nn.ConvTranspose2d(256, 128, kernel_size=3, stride=2, padding=1, output_padding=1),
-            nn.ReLU(),
-            nn.ConvTranspose2d(128, 64, kernel_size=3, stride=2, padding=1, output_padding=1),
-            nn.ReLU(),
-            nn.ConvTranspose2d(64, num_channels, kernel_size=3, stride=2, padding=1, output_padding=1)
-        )
+        # LSTM
+        self.lstm = nn.LSTM(input_size=51200,  # Adjust this value
+                            hidden_size=256,
+                            num_layers=2,
+                            batch_first=True)
+
+        # Fully Connected
+        self.fc = nn.Linear(256, num_channels * img_size[0] * img_size[1] * num_output_frames)
+
+   
 
     def forward(self, x):
         batch_size, num_frames, channels, height, width = x.size()
+        print(f"Input shape: {x.size()}")
         x = x.reshape(batch_size, num_frames * channels, height, width)
 
-        x = self.encoder(x)
-        x = self.decoder(x)
+        # CNN
+        x = self.cnn(x)
+        print(f"After CNN: {x.size()}")
 
+        # Reshape for LSTM input
+        x = x.view(batch_size, num_input_frames, -1)
+        print(f"Before LSTM: {x.size()}")
+
+        # LSTM
+        _, (h_n, _) = self.lstm(x)
+        x = h_n[-1]
+        print(f"After LSTM: {x.size()}")
+
+        # Fully Connected
+        x = self.fc(x)
+        print(f"After Fully Connected: {x.size()}")
+
+        # Reshape to output shape
         x = x.reshape(batch_size, num_output_frames, channels, height, width)
+        print(f"Output shape: {x.size()}")
         return x
-
 class TestDataset(Dataset):
     def __init__(self, folder, test_sets):
         self.folder = folder
@@ -161,15 +177,10 @@ def calculate_metrics(predicted_frames, ground_truth_frames):
     
     return mse, psnr, ssim_avg
 
-def apply_sharpening(frame):
-    kernel = np.array([[0, -1, 0],
-                       [-1, 5,-1],
-                       [0, -1, 0]])
-    return cv2.filter2D(frame, -1, kernel)
-
 def create_gif(frames, output_path):
-    sharpened_frames = [apply_sharpening(frame.astype(np.uint8)) for frame in frames]
-    imageio.mimsave(output_path, sharpened_frames, duration=0.1)
+    # Convert frames to uint8 data type
+    frames = [frame.astype(np.uint8) for frame in frames]
+    imageio.mimsave(output_path, frames, duration=0.1)
     
 def create_video(frames, output_path):
     # Get the frame dimensions
@@ -177,7 +188,7 @@ def create_video(frames, output_path):
     
     # Create a video writer object
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    video_writer = cv2.VideoWriter(output_path, fourcc, 2, (width, height))
+    video_writer = cv2.VideoWriter(output_path, fourcc, 10, (width, height))
     
     # Write frames to the video
     for frame in frames:
