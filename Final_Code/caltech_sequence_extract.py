@@ -44,6 +44,9 @@ def convert_seq_to_images(set_path):
         
         seq.release()
 
+        # Delete the .seq file after processing
+        os.remove(os.path.join(set_path, seq_file))
+
 # Convert .seq files to images for the train sets
 for train_set in train_sets:
     set_path = os.path.join(train_root, train_set, train_set)
