@@ -19,7 +19,7 @@ num_output_frames = 1
 
 # Set the batch size and number of epochs
 batch_size = 30
-num_epochs = 1
+num_epochs = 10
 
 # Check if CUDA is available
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -43,43 +43,63 @@ class PredNet(nn.Module):
     def __init__(self, input_shape):
         super(PredNet, self).__init__()
 
-        self.encoder = nn.Sequential(
-            nn.Conv2d(input_shape[0] * input_shape[3], 64, kernel_size=3, padding=1),
+        # CNN
+        self.cnn = nn.Sequential(
+            nn.Conv2d(input_shape[0] * input_shape[3], 32, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2),
+            nn.Conv2d(32, 64, kernel_size=3, padding=1),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2),
             nn.Conv2d(64, 128, kernel_size=3, padding=1),
             nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2),
-            nn.Conv2d(128, 256, kernel_size=3, padding=1),
-            nn.ReLU(),
             nn.MaxPool2d(kernel_size=2)
         )
 
-        self.decoder = nn.Sequential(
-            nn.ConvTranspose2d(256, 128, kernel_size=3, stride=2, padding=1, output_padding=1),
-            nn.ReLU(),
-            nn.ConvTranspose2d(128, 64, kernel_size=3, stride=2, padding=1, output_padding=1),
-            nn.ReLU(),
-            nn.ConvTranspose2d(64, num_channels, kernel_size=3, stride=2, padding=1, output_padding=1)
-        )
+        # LSTM
+        self.lstm = nn.LSTM(input_size=51200,  # Adjust this value
+                            hidden_size=256,
+                            num_layers=2,
+                            batch_first=True)
+
+        # Fully Connected
+        self.fc = nn.Linear(256, num_channels * img_size[0] * img_size[1] * num_output_frames)
+
+   
 
     def forward(self, x):
         batch_size, num_frames, channels, height, width = x.size()
+        print(f"Input shape: {x.size()}")
         x = x.reshape(batch_size, num_frames * channels, height, width)
 
-        x = self.encoder(x)
-        x = self.decoder(x)
+        # CNN
+        x = self.cnn(x)
+        print(f"After CNN: {x.size()}")
 
+        # Reshape for LSTM input
+        x = x.view(batch_size, num_input_frames, -1)
+        print(f"Before LSTM: {x.size()}")
+
+        # LSTM
+        _, (h_n, _) = self.lstm(x)
+        x = h_n[-1]
+        print(f"After LSTM: {x.size()}")
+
+        # Fully Connected
+        x = self.fc(x)
+        print(f"After Fully Connected: {x.size()}")
+
+        # Reshape to output shape
         x = x.reshape(batch_size, num_output_frames, channels, height, width)
+        print(f"Output shape: {x.size()}")
         return x
-
 class VideoDataset(Dataset):
     def __init__(self, folder):
         self.folder = folder
         self.train_data = []
         
         # Specify the train sets to use
-        train_sets = ["set00", "set01"]
+        train_sets = ["set00",'set01','set02','set03','set04']
         
         # Iterate over the specified train sets
         for train_set in train_sets:
