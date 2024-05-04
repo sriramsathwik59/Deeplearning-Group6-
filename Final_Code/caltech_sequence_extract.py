@@ -6,8 +6,8 @@ train_root = "/home/ubuntu/Deeplearning-Group6-/Test/Train/"
 test_root = "/home/ubuntu/Deeplearning-Group6-/Test/Test/"
 
 # Set the names of the train and test sets
-train_sets = ["set00"]
-test_sets = ["set06"]
+train_sets = ["set00","set01","set02","set03","set04"]
+test_sets = ["set06","set07","set08","set09","set10"]
 
 # Destination directories for saving train and test images
 train_output_dir = "/home/ubuntu/Deeplearning-Group6-/Test/Train_Images/"
