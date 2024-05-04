@@ -2,8 +2,8 @@ import os
 import cv2
 
 # Set the path to the train and test folders
-train_root = "/home/ubuntu/Train/"
-test_root = "/home/ubuntu/Test/"
+train_root = "/home/ubuntu/Deeplearning-Group6-/Test/Train/"
+test_root = "/home/ubuntu/Deeplearning-Group6-/Test/Test/"
 
 # Set the names of the train and test sets
 train_sets = ["set00"]
