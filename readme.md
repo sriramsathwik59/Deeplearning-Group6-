@@ -6,7 +6,7 @@ This README provides step-by-step instructions to set up and run the project.
 First, clone the repository to your local machine.
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/sriramsathwik59/Deeplearning-Group6-
 ```
 
 ## Step 2: Navigate to the Repository Directory
