@@ -15,7 +15,7 @@ num_frames = 6
 
 # Set the batch size and number of epochs
 batch_size = 1
-num_epochs = 5
+num_epochs = 1
 
 # Path to the folder containing images
 image_folder = '/home/ubuntu/Train_Images/'
