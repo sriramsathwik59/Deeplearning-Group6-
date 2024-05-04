@@ -58,5 +58,7 @@ Run `test.py` to execute the testing phase. Make sure the paths to the test data
 ```bash
 python3 test.py
 ```
+## Final Instruction
+Make sure that the `dataset` folder, `train.py`, `test.py`, and `sequence.py` are all in the same `Final_Code` folder to ensure proper functioning of the scripts.
 
 Follow these steps to ensure your project is set up correctly and ready to run.
